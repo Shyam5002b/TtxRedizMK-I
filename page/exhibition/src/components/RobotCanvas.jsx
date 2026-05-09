@@ -16,27 +16,25 @@ function InteractiveRobot() {
   const hoveredProjectId = useStore((state) => state.hoveredProject);
   
   // Memoize canvas setup so it persists
-  const [faceCtx, setFaceCtx] = useState(null);
-
-  useEffect(() => {
+  const { faceCanvas, faceCtx, faceTexture } = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
     
     // Initial dark screen
-    ctx.fillStyle = '#111111';
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, 512, 256);
     
-    canvasRef.current = canvas;
-    faceTextureRef.current = new THREE.CanvasTexture(canvas);
-    faceTextureRef.current.colorSpace = THREE.SRGBColorSpace;
-    setFaceCtx(ctx);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    
+    return { faceCanvas: canvas, faceCtx: ctx, faceTexture: texture };
   }, []);
 
   // Update Face Canvas based on Boot State and Hover Mood
   useEffect(() => {
-    if (!faceCtx || !faceTextureRef.current) return;
+    if (!faceCtx || !faceTexture) return;
     
     // Draw helper
     const fillFace = (color) => {
@@ -54,7 +52,7 @@ function InteractiveRobot() {
     };
 
     const drawText = (text, size = '40px') => {
-      fillFace('#111111');
+      fillFace('#000000');
       faceCtx.fillStyle = '#ffffff';
       faceCtx.font = `bold ${size} monospace`;
       faceCtx.textAlign = 'center';
@@ -63,11 +61,11 @@ function InteractiveRobot() {
       faceCtx.shadowBlur = 10;
       faceCtx.fillText(text, 256, 128);
       faceCtx.shadowBlur = 0;
-      faceTextureRef.current.needsUpdate = true;
+      faceTexture.needsUpdate = true;
     };
 
     const drawEyes = (mood) => {
-      fillFace('#111111');
+      fillFace('#000000');
       faceCtx.fillStyle = '#ffffff';
       faceCtx.shadowColor = '#ffffff';
       faceCtx.shadowBlur = 15;
@@ -83,36 +81,49 @@ function InteractiveRobot() {
         drawCircle(160, 128, 25);
         drawCircle(352, 128, 25);
       } else if (mood === 'happy') {
-        // Happy arch eyes
+        // Happy arch eyes (U shapes)
+        faceCtx.lineWidth = 12;
+        faceCtx.lineCap = 'round';
+        faceCtx.strokeStyle = '#ffffff';
         faceCtx.beginPath();
         faceCtx.arc(160, 138, 25, Math.PI, Math.PI * 2);
-        faceCtx.fill();
+        faceCtx.stroke();
         faceCtx.beginPath();
         faceCtx.arc(352, 138, 25, Math.PI, Math.PI * 2);
-        faceCtx.fill();
+        faceCtx.stroke();
       } else if (mood === 'focused') {
         // Focused semi-circles (looking sharp)
         faceCtx.beginPath();
-        faceCtx.arc(160, 128, 25, 0, Math.PI);
+        faceCtx.arc(160, 128, 25, 0, Math.PI, true); // draw upper half
         faceCtx.fill();
         faceCtx.beginPath();
-        faceCtx.arc(352, 128, 25, 0, Math.PI);
+        faceCtx.arc(352, 128, 25, 0, Math.PI, true);
         faceCtx.fill();
       } else if (mood === 'surprised') {
-        // Wide circle eyes
-        drawCircle(160, 128, 35);
-        drawCircle(352, 128, 35);
+        // Wide outline circle eyes, looking hollow
+        faceCtx.lineWidth = 10;
+        faceCtx.strokeStyle = '#ffffff';
+        faceCtx.beginPath();
+        faceCtx.arc(160, 128, 30, 0, Math.PI * 2);
+        faceCtx.stroke();
+        faceCtx.beginPath();
+        faceCtx.arc(352, 128, 30, 0, Math.PI * 2);
+        faceCtx.stroke();
+      } else if (mood === 'loading') {
+        // Loading dots or spinning eyes
+        faceCtx.fillRect(145, 123, 30, 10);
+        faceCtx.fillRect(337, 123, 30, 10);
       }
       
       faceCtx.shadowBlur = 0;
-      faceTextureRef.current.needsUpdate = true;
+      faceTexture.needsUpdate = true;
     };
 
     // Logic Tree
     if (bootState === 'black') {
       faceCtx.fillStyle = '#111111';
       faceCtx.fillRect(0, 0, 512, 256);
-      faceTextureRef.current.needsUpdate = true;
+      faceTexture.needsUpdate = true;
     } else if (bootState === 'init') {
       drawText('Initialize Protocol', '30px');
     } else if (bootState === 'system_on') {
@@ -127,7 +138,7 @@ function InteractiveRobot() {
       drawEyes(targetMood);
     }
 
-  }, [bootState, hoveredProjectId, faceCtx]);
+  }, [bootState, hoveredProjectId, faceCtx, faceTexture]);
   
   useFrame((state) => {
     if (!groupRef.current) return;
@@ -152,18 +163,14 @@ function InteractiveRobot() {
       </RoundedBox>
 
       {/* Screen Base */}
-      <RoundedBox args={[2.1, 1.5, 0.1]} radius={0.3} smoothness={4} position={[0, 1.5, 0.91]}>
+      <RoundedBox args={[2.1, 1.5, 0.1]} radius={0.1} smoothness={4} position={[0, 1.5, 0.91]}>
         <meshStandardMaterial color="#111111" />
       </RoundedBox>
 
       {/* Interactive LED Face (slightly in front of the screen base to prevent z-fighting) */}
-      <mesh position={[0, 1.5, 0.97]}>
+      <mesh position={[0, 1.5, 0.98]}>
         <planeGeometry args={[1.9, 1.3]} />
-        {faceTextureRef.current ? (
-          <meshBasicMaterial map={faceTextureRef.current} transparent />
-        ) : (
-          <meshBasicMaterial color="#111111" />
-        )}
+        <meshBasicMaterial map={faceTexture} transparent={false} />
       </mesh>
 
       {/* Ears */}

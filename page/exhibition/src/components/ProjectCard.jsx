@@ -50,15 +50,11 @@ const ProjectCard = ({ project }) => {
     >
       <div className="card-inner">
         <div id={`front-${project.id}`} className="card-front glass">
-          <video 
-            ref={videoRef}
+          <img 
             src={project.video} 
-            loop 
-            muted 
-            playsInline 
-            crossOrigin="anonymous" 
-            preload="none"
-          ></video>
+            alt={project.title}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, zIndex: 1, borderRadius: '16px' }}
+          />
           <div className="card-front-overlay">
             <h3>MOD // {project.id}</h3>
             <p>{project.title}</p>
