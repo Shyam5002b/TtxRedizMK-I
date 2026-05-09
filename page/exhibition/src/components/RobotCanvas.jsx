@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Environment, Stars } from '@react-three/drei';
+import { Environment, Stars, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import useStore from '../store/useStore';
 import { projectData } from '../data/projects';
@@ -24,8 +24,8 @@ function InteractiveRobot() {
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
     
-    // Initial black screen
-    ctx.fillStyle = '#000000';
+    // Initial dark screen
+    ctx.fillStyle = '#111111';
     ctx.fillRect(0, 0, 512, 256);
     
     canvasRef.current = canvas;
@@ -42,10 +42,19 @@ function InteractiveRobot() {
     const fillFace = (color) => {
       faceCtx.fillStyle = color;
       faceCtx.fillRect(0, 0, 512, 256);
+      
+      // Draw screen border glow (Agentix style)
+      const gradient = faceCtx.createLinearGradient(0, 0, 512, 256);
+      gradient.addColorStop(0, "rgba(50, 80, 255, 0.4)");
+      gradient.addColorStop(1, "rgba(255, 50, 150, 0.4)");
+      
+      faceCtx.lineWidth = 14;
+      faceCtx.strokeStyle = gradient;
+      faceCtx.strokeRect(7, 7, 498, 242);
     };
 
     const drawText = (text, size = '40px') => {
-      fillFace('#000000');
+      fillFace('#111111');
       faceCtx.fillStyle = '#ffffff';
       faceCtx.font = `bold ${size} monospace`;
       faceCtx.textAlign = 'center';
@@ -58,27 +67,41 @@ function InteractiveRobot() {
     };
 
     const drawEyes = (mood) => {
-      fillFace('#000000');
+      fillFace('#111111');
       faceCtx.fillStyle = '#ffffff';
       faceCtx.shadowColor = '#ffffff';
       faceCtx.shadowBlur = 15;
       
-      if (mood === 'neutral' || !mood) {
-        faceCtx.fillRect(80, 80, 80, 60);
-        faceCtx.fillRect(352, 80, 80, 60);
-      } else if (mood === 'happy') {
-        faceCtx.fillRect(80, 100, 80, 30);
-        faceCtx.fillRect(352, 100, 80, 30);
-      } else if (mood === 'focused') {
+      const drawCircle = (x, y, r) => {
         faceCtx.beginPath();
-        faceCtx.moveTo(80, 80); faceCtx.lineTo(160, 100); faceCtx.lineTo(160, 120); faceCtx.lineTo(80, 120);
+        faceCtx.arc(x, y, r, 0, Math.PI * 2);
+        faceCtx.fill();
+        faceCtx.closePath();
+      };
+      
+      if (mood === 'neutral' || !mood) {
+        drawCircle(160, 128, 25);
+        drawCircle(352, 128, 25);
+      } else if (mood === 'happy') {
+        // Happy arch eyes
+        faceCtx.beginPath();
+        faceCtx.arc(160, 138, 25, Math.PI, Math.PI * 2);
         faceCtx.fill();
         faceCtx.beginPath();
-        faceCtx.moveTo(432, 80); faceCtx.lineTo(352, 100); faceCtx.lineTo(352, 120); faceCtx.lineTo(432, 120);
+        faceCtx.arc(352, 138, 25, Math.PI, Math.PI * 2);
+        faceCtx.fill();
+      } else if (mood === 'focused') {
+        // Focused semi-circles (looking sharp)
+        faceCtx.beginPath();
+        faceCtx.arc(160, 128, 25, 0, Math.PI);
+        faceCtx.fill();
+        faceCtx.beginPath();
+        faceCtx.arc(352, 128, 25, 0, Math.PI);
         faceCtx.fill();
       } else if (mood === 'surprised') {
-        faceCtx.fillRect(90, 60, 60, 90);
-        faceCtx.fillRect(362, 60, 60, 90);
+        // Wide circle eyes
+        drawCircle(160, 128, 35);
+        drawCircle(352, 128, 35);
       }
       
       faceCtx.shadowBlur = 0;
@@ -87,7 +110,8 @@ function InteractiveRobot() {
 
     // Logic Tree
     if (bootState === 'black') {
-      fillFace('#000000');
+      faceCtx.fillStyle = '#111111';
+      faceCtx.fillRect(0, 0, 512, 256);
       faceTextureRef.current.needsUpdate = true;
     } else if (bootState === 'init') {
       drawText('Initialize Protocol', '30px');
@@ -109,8 +133,8 @@ function InteractiveRobot() {
     if (!groupRef.current) return;
     
     const t = state.clock.getElapsedTime();
-    // Bobbing
-    groupRef.current.position.y = Math.sin(t * 1.5) * 0.2 + 2;
+    // Bobbing - adjusted lower to not overlap with text
+    groupRef.current.position.y = Math.sin(t * 1.5) * 0.15 - 1.0;
     
     // Mouse tracking
     const mouseX = (state.pointer.x * Math.PI) / 4;
@@ -121,25 +145,96 @@ function InteractiveRobot() {
   });
 
   return (
-    <group ref={groupRef} position={[0, 2, -5]}>
-      {/* Glossy Pill shape */}
-      <mesh>
-        <capsuleGeometry args={[1, 2.5, 4, 16]} />
-        <meshPhysicalMaterial 
-          color="#ffffff" 
-          metalness={0.6} 
-          roughness={0.1} 
-          clearcoat={1} 
-        />
-      </mesh>
-      {/* Interactive LED Face */}
-      <mesh position={[0, 0.5, 1.01]}>
-        <planeGeometry args={[1.5, 0.8]} />
+    <group ref={groupRef} position={[0, -1.0, -5]}>
+      {/* Head */}
+      <RoundedBox args={[2.4, 1.8, 1.8]} radius={0.4} smoothness={4} position={[0, 1.5, 0]}>
+        <meshStandardMaterial color="#d4c9b9" roughness={0.4} metalness={0.1} />
+      </RoundedBox>
+
+      {/* Screen Base */}
+      <RoundedBox args={[2.1, 1.5, 0.1]} radius={0.3} smoothness={4} position={[0, 1.5, 0.91]}>
+        <meshStandardMaterial color="#111111" />
+      </RoundedBox>
+
+      {/* Interactive LED Face (slightly in front of the screen base to prevent z-fighting) */}
+      <mesh position={[0, 1.5, 0.97]}>
+        <planeGeometry args={[1.9, 1.3]} />
         {faceTextureRef.current ? (
           <meshBasicMaterial map={faceTextureRef.current} transparent />
         ) : (
-          <meshBasicMaterial color="#000000" />
+          <meshBasicMaterial color="#111111" />
         )}
+      </mesh>
+
+      {/* Ears */}
+      <mesh position={[-1.3, 1.5, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.3, 0.3, 0.3, 32]} />
+        <meshStandardMaterial color="#333333" />
+      </mesh>
+      <mesh position={[1.3, 1.5, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.3, 0.3, 0.3, 32]} />
+        <meshStandardMaterial color="#333333" />
+      </mesh>
+      
+      {/* Ear Rings glow */}
+      <mesh position={[-1.46, 1.5, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <ringGeometry args={[0.1, 0.15, 32]} />
+        <meshBasicMaterial color="#9165ff" side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[1.46, 1.5, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <ringGeometry args={[0.1, 0.15, 32]} />
+        <meshBasicMaterial color="#9165ff" side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Antenna */}
+      <mesh position={[0, 2.5, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 0.5]} />
+        <meshStandardMaterial color="#888888" />
+      </mesh>
+      <mesh position={[0, 2.8, 0]}>
+        <sphereGeometry args={[0.15]} />
+        <meshStandardMaterial color="#9165ff" emissive="#9165ff" emissiveIntensity={0.5} />
+      </mesh>
+
+      {/* Body */}
+      <RoundedBox args={[1.8, 1.5, 1.5]} radius={0.3} smoothness={4} position={[0, -0.3, 0]}>
+        <meshStandardMaterial color="#d4c9b9" roughness={0.4} metalness={0.1} />
+      </RoundedBox>
+      <RoundedBox args={[1.2, 1.0, 0.1]} radius={0.1} smoothness={4} position={[0, -0.3, 0.76]}>
+        <meshStandardMaterial color="#bbafa0" />
+      </RoundedBox>
+      {/* Body Status Light (Diamond) */}
+      <mesh position={[0, -0.3, 0.82]} rotation={[0, 0, Math.PI / 4]}>
+        <planeGeometry args={[0.15, 0.15]} />
+        <meshBasicMaterial color="#9165ff" />
+      </mesh>
+
+      {/* Arms */}
+      <mesh position={[-1.1, -0.1, 0]} rotation={[0, 0, -Math.PI / 6]}>
+        <capsuleGeometry args={[0.2, 0.6, 4, 16]} />
+        <meshStandardMaterial color="#333333" />
+      </mesh>
+      <mesh position={[1.1, -0.1, 0]} rotation={[0, 0, Math.PI / 6]}>
+        <capsuleGeometry args={[0.2, 0.6, 4, 16]} />
+        <meshStandardMaterial color="#333333" />
+      </mesh>
+      
+      {/* Legs & Feet */}
+      <mesh position={[-0.5, -1.2, 0]}>
+        <cylinderGeometry args={[0.15, 0.15, 0.5]} />
+        <meshStandardMaterial color="#333333" />
+      </mesh>
+      <mesh position={[0.5, -1.2, 0]}>
+        <cylinderGeometry args={[0.15, 0.15, 0.5]} />
+        <meshStandardMaterial color="#333333" />
+      </mesh>
+      <mesh position={[-0.5, -1.5, 0.1]}>
+        <capsuleGeometry args={[0.25, 0.3, 4, 16]} />
+        <meshStandardMaterial color="#d4c9b9" />
+      </mesh>
+      <mesh position={[0.5, -1.5, 0.1]}>
+        <capsuleGeometry args={[0.25, 0.3, 4, 16]} />
+        <meshStandardMaterial color="#d4c9b9" />
       </mesh>
     </group>
   );
